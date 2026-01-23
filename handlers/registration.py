@@ -1,4 +1,5 @@
 import re
+import logging
 from datetime import datetime
 from aiogram import Router, F, types, Bot
 from aiogram.types import FSInputFile
@@ -18,11 +19,13 @@ from keyboards.builders import (
 from config import config
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 # ==================== START ====================
 
 @router.message(Command("start"), StateFilter("*"))
 async def cmd_start(message: types.Message, state: FSMContext):
+    logger.info(f"User {message.from_user.id} requested /start")
     await state.clear()
     text = (
         "Привет, будущий IT-специалист!\n"
@@ -50,8 +53,11 @@ async def cmd_start(message: types.Message, state: FSMContext):
 
 @router.message(F.text == "📝 Зарегистрироваться")
 async def start_registration(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    logger.info(f"User {user_id} started registration")
     user = await get_user(message.from_user.id)
     if user:
+        logger.info(f"User {user_id} tried to register again but is already registered")
         await message.answer("Вы уже зарегистрированы! Скоро через бот с тобой свяжется наш менеджер менеджер и сообщит о результатах отбора 😊")
         return
 
@@ -60,6 +66,7 @@ async def start_registration(message: types.Message, state: FSMContext):
 
 @router.message(Registration.full_name)
 async def process_name(message: types.Message, state: FSMContext):
+    logger.info(f"User {message.from_user.id} provided name: {message.text}")
     await state.update_data(full_name=message.text)
     await message.answer("Сколько тебе лет? Напиши число.")
     await state.set_state(Registration.age)
@@ -67,8 +74,10 @@ async def process_name(message: types.Message, state: FSMContext):
 @router.message(Registration.age)
 async def process_age(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
+        logger.warning(f"User {message.from_user.id} provided invalid age: {message.text}")
         await message.answer("Пожалуйста, введите число (возраст).")
         return
+    logger.info(f"User {message.from_user.id} provided age: {message.text}")
     await state.update_data(age=int(message.text))
     await message.answer("Напиши свой Email:")
     await state.set_state(Registration.email)
@@ -78,8 +87,11 @@ async def process_email(message: types.Message, state: FSMContext):
     email = message.text
     # Simple regex validation
     if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        logger.warning(f"User {message.from_user.id} provided invalid email: {email}")
         await message.answer("Пожалуйста, введите корректный email.")
         return
+    
+    logger.info(f"User {message.from_user.id} provided email: {email}")
     await state.update_data(email=email)
     
     await message.answer("Состоишь ли ты в AIESEC?", reply_markup=get_yes_no_kb())
@@ -264,6 +276,7 @@ async def process_expectations(message: types.Message, state: FSMContext, bot: B
     await state.update_data(expectations=message.text)
     
     data = await state.get_data()
+    logger.info(f"User {message.from_user.id} finished registration. Saving data.")
     
     # Prepare data for saving
     data['telegram_id'] = message.from_user.id
@@ -273,6 +286,7 @@ async def process_expectations(message: types.Message, state: FSMContext, bot: B
     
     # 1. Save to SQLite
     await add_user(data)
+    logger.info(f"User {message.from_user.id} saved to DB.")
     
     # 2. Append to Google Sheets
     row = [
@@ -299,7 +313,9 @@ async def process_expectations(message: types.Message, state: FSMContext, bot: B
     # Wrap in try except to not fail registration if google fails
     try:
         await append_to_sheet(row)
+        logger.info(f"User {message.from_user.id} saved to Google Spreadsheet.")
     except Exception as e:
+        logger.error(f"Error saving user {message.from_user.id} to Google Sheets: {e}")
         pass # Logging handled inside service
 
     # 3. Notify Admin
@@ -312,7 +328,8 @@ async def process_expectations(message: types.Message, state: FSMContext, bot: B
         for admin_id in config.ADMIN_IDS:
             try:
                 await bot.send_message(admin_id, admin_text, parse_mode="HTML")
-            except:
+            except Exception as e:
+                logger.error(f"Failed to notify admin {admin_id}: {e}")
                 pass
 
     await state.clear()

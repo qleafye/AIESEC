@@ -1,3 +1,4 @@
+import logging
 from aiogram import Router, F, types, Bot
 from aiogram.fsm.context import FSMContext
 from database.db import get_user, set_ambassador_candidate
@@ -11,10 +12,12 @@ from handlers.states import Question
 from config import config
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 # ℹ️ Информация о форуме
 @router.message(F.text == "ℹ️ Информация о форуме")
 async def show_info_menu(message: types.Message):
+    logger.info(f"User {message.from_user.id} requested Info menu")
     # Check if both are confirmed
     if config.IS_DATE_CONFIRMED and config.IS_PLACE_CONFIRMED:
         # One button / text for everything
@@ -62,6 +65,7 @@ async def info_place(callback: types.CallbackQuery):
 # 📅 Программа форума
 @router.message(F.text == "📅 Программа форума")
 async def show_program(message: types.Message):
+    logger.info(f"User {message.from_user.id} requested Program")
     # Заглушка, так как программа может меняться
     text = (
         "Держи, это программа форума! \n"
@@ -75,6 +79,7 @@ async def show_program(message: types.Message):
 # 🗣 Спикеры
 @router.message(F.text == "🗣 Спикеры")
 async def show_speakers(message: types.Message):
+    logger.info(f"User {message.from_user.id} requested Speakers")
     # Заглушка
     text = (
         "Мы пригласили экспертов из топовых компаний!\n"
@@ -85,6 +90,7 @@ async def show_speakers(message: types.Message):
 # 📞 Контакты
 @router.message(F.text == "📞 Контакты")
 async def show_contacts(message: types.Message):
+    logger.info(f"User {message.from_user.id} requested Contacts")
     text = (
         "По всем вопросам пиши нашему менеджеру Юле:\n"
         "👉 @julyisnearby"
@@ -94,6 +100,7 @@ async def show_contacts(message: types.Message):
 # ⭐ Стать Амбассадором
 @router.message(F.text == "⭐ Стать Амбассадором")
 async def become_ambassador_menu(message: types.Message):
+    logger.info(f"User {message.from_user.id} requested Ambassador menu")
     text = (
         "<b>Стать Амбассадором SkillUp</b>\n\n"
         "Ты можешь стать связующим звеном между участниками и организаторами – тем, кто помогает форуму расти и становиться лучше!\n\n"
@@ -108,6 +115,7 @@ async def become_ambassador_menu(message: types.Message):
 @router.callback_query(F.data == "become_ambassador")
 async def process_become_ambassador(callback: types.CallbackQuery, bot: Bot):
     user_info = f"@{callback.from_user.username}" if callback.from_user.username else f"ID: {callback.from_user.id}"
+    logger.info(f"User {callback.from_user.id} applied to be Ambassador")
     link = f"tg://user?id={callback.from_user.id}"
     
     # Notify Admin
@@ -119,7 +127,8 @@ async def process_become_ambassador(callback: types.CallbackQuery, bot: Bot):
                     f"🌟 <b>Заявка в амбассадоры!</b>\nПользователь: <a href='{link}'>{user_info}</a>",
                     parse_mode="HTML"
                 )
-            except:
+            except Exception as e:
+                logger.error(f"Failed to notify admin {admin_id} about ambassador application: {e}")
                 pass
 
     # Update DB
@@ -134,6 +143,7 @@ async def process_become_ambassador(callback: types.CallbackQuery, bot: Bot):
 # ❓ Задать вопрос
 @router.message(F.text == "❓ Задать вопрос")
 async def ask_organizer_start(message: types.Message, state: FSMContext):
+    logger.info(f"User {message.from_user.id} wants to ask a question")
     await message.answer(
         "Напишите ваш вопрос, и мы передадим его организаторам.",
         reply_markup=get_cancel_kb()
@@ -143,30 +153,35 @@ async def ask_organizer_start(message: types.Message, state: FSMContext):
 @router.message(Question.waiting_for_question)
 async def process_question(message: types.Message, state: FSMContext, bot: Bot):
     if message.text == "Отмена":
+        logger.info(f"User {message.from_user.id} canceled question")
         await state.clear()
         await message.answer("Действие отменено.", reply_markup=get_main_menu_kb())
         return
 
     question_text = message.text
+    logger.info(f"User {message.from_user.id} sent question: {question_text}")
     user_info = f"@{message.from_user.username}" if message.from_user.username else f"ID: {message.from_user.id}"
     
     admin_text = f"❓ <b>Новый вопрос от {user_info}:</b>\n\n{question_text}"
     
     # Send to all admins
+    sent_count = 0
     if config.ADMIN_IDS:
-        sent_count = 0
         for admin_id in config.ADMIN_IDS:
             try:
                 await bot.send_message(admin_id, admin_text, parse_mode="HTML")
                 sent_count += 1
-            except Exception:
+            except Exception as e:
+                logger.error(f"Failed to send question to admin {admin_id}: {e}")
                 pass
         
         if sent_count > 0:
             await message.answer("Ваш вопрос отправлен!", reply_markup=get_main_menu_kb())
         else:
+            logger.error(f"Failed to send question from {message.from_user.id} to any admin")
             await message.answer("Не удалось отправить вопрос, попробуйте позже.", reply_markup=get_main_menu_kb())
     else:
+        logger.warning("No admins configured to receive questions")
         await message.answer("Администраторы не настроены.", reply_markup=get_main_menu_kb())
     
     await state.clear()
