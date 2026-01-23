@@ -1,0 +1,7 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+data/forum.db
+google_credentials.json
+.DS_Store
