@@ -173,11 +173,10 @@ async def process_ed_status(message: types.Message, state: FSMContext):
         await state.set_state(Registration.uni_current_name)
     elif status == "Нет, завершил(а) обучение":
         await message.answer(
-            "В каком учебном заведении ты учился(лась)? На каком направлении?\n"
-            "Например: СПБГУ, Бакалавриат, Информационные системы",
-            reply_markup=types.ReplyKeyboardRemove()
+            "В каком учебном заведении ты учился(лась)?",
+            reply_markup=get_universities_kb()
         )
-        await state.set_state(Registration.uni_past_name)
+        await state.set_state(Registration.uni_past_choose)
     else:
         # Skip university info
         await ask_work(message, state)
@@ -215,19 +214,28 @@ async def process_uni_specialty(message: types.Message, state: FSMContext):
     specialty = message.text
     # Save specialty separately
     await state.update_data(specialty=specialty)
-    
-    # We already have 'university' (from uni_name or custom) and 'course' in state
-    # Rename keys if needed or just use what we have. 
-    # In process_uni_current/custom we saved to 'uni_name', let's normalize this in process_expectations 
-    # OR better: ensure we use consistent keys now.
-    
     await ask_work(message, state)
 
-@router.message(Registration.uni_past_name)
-async def process_uni_past(message: types.Message, state: FSMContext):
-    # For finished users, they input "Uni name, specialty" string.
-    # We'll save it to university and leave others empty or mark as finished
-    await state.update_data(university=message.text, course="Закончил", specialty="-")
+@router.message(Registration.uni_past_choose)
+async def process_uni_past_choose(message: types.Message, state: FSMContext):
+    uni = message.text
+    if uni == "Другое":
+        await message.answer("Введите название вашего ВУЗа вручную:", reply_markup=types.ReplyKeyboardRemove())
+        await state.set_state(Registration.uni_past_custom)
+    else:
+        await state.update_data(university=uni, course="Закончил")
+        await message.answer("Какое у вас было направление обучения (специальность)?", reply_markup=types.ReplyKeyboardRemove())
+        await state.set_state(Registration.uni_past_specialty)
+
+@router.message(Registration.uni_past_custom)
+async def process_uni_past_custom(message: types.Message, state: FSMContext):
+    await state.update_data(university=message.text, course="Закончил")
+    await message.answer("Какое у вас было направление обучения (специальность)?", reply_markup=types.ReplyKeyboardRemove())
+    await state.set_state(Registration.uni_past_specialty)
+
+@router.message(Registration.uni_past_specialty)
+async def process_uni_past_specialty(message: types.Message, state: FSMContext):
+    await state.update_data(specialty=message.text)
     await ask_work(message, state)
 
 # --- Work LogicHelper ---

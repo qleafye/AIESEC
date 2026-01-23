@@ -25,7 +25,9 @@ class Registration(StatesGroup):
     uni_current_specialty = State()
     
     # Past/Finished Branch
-    uni_past_name = State()    # For finished
+    uni_past_choose = State()
+    uni_past_custom = State()
+    uni_past_specialty = State()
     
     # Work Logic
     work_status = State()
