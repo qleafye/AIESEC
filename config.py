@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     GOOGLE_CREDENTIALS_FILE: str = "google_credentials.json"
     
     # Forum Info Status
-    IS_DATE_CONFIRMED: bool = False
+    IS_DATE_CONFIRMED: bool = True
     IS_PLACE_CONFIRMED: bool = False
     
     class Config:

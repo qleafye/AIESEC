@@ -23,7 +23,7 @@ async def show_info_menu(message: types.Message):
         # One button / text for everything
         text = (
             "<b>Форум SkillUp</b>\n\n"
-            "🗓 <b>Дата:</b> 25 апреля\n"
+            "🗓 <b>Дата:</b> 26 апреля\n"
             "⌚ <b>Время:</b> с 11:00 до 19:00\n"
             "📍 <b>Место:</b> ITHUB (адрес уточняется)"
         )
@@ -46,7 +46,7 @@ async def show_info_menu(message: types.Message):
 @router.callback_query(F.data == "info_date")
 async def info_date(callback: types.CallbackQuery):
     if config.IS_DATE_CONFIRMED:
-        text = "🗓 Форум пройдет 25 апреля с 11:00 до 19:00"
+        text = "🗓 Форум пройдет 26 апреля!!!"
     else:
         text = "🗓 Форум состоится в конце апреля. Скоро сообщим точную дату и время 🙂"
     await callback.message.answer(text)
