@@ -56,10 +56,15 @@ async def start_registration(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     logger.info(f"User {user_id} started registration")
     user = await get_user(message.from_user.id)
+    
+    # Check if user exists. Admins can re-register infinitely.
     if user:
-        logger.info(f"User {user_id} tried to register again but is already registered")
-        await message.answer("Вы уже зарегистрированы! Скоро через бот с тобой свяжется наш менеджер менеджер и сообщит о результатах отбора 😊")
-        return
+        if user_id in config.ADMIN_IDS:
+            await message.answer("🛠 Ты являешься администратором, поэтому можешь зарегистрироваться повторно.")
+        else:
+            logger.info(f"User {user_id} tried to register again but is already registered")
+            await message.answer("Ты уже зарегистрирован!😊")
+            return
 
     await message.answer("Супер, начнем с простого. Напиши свою Фамилию и Имя:")
     await state.set_state(Registration.full_name)
@@ -75,7 +80,7 @@ async def process_name(message: types.Message, state: FSMContext):
 async def process_age(message: types.Message, state: FSMContext):
     if not message.text.isdigit():
         logger.warning(f"User {message.from_user.id} provided invalid age: {message.text}")
-        await message.answer("Пожалуйста, введите число (возраст).")
+        await message.answer("Пожалуйста, введи число (возраст).")
         return
     logger.info(f"User {message.from_user.id} provided age: {message.text}")
     await state.update_data(age=int(message.text))
@@ -88,7 +93,7 @@ async def process_email(message: types.Message, state: FSMContext):
     # Simple regex validation
     if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
         logger.warning(f"User {message.from_user.id} provided invalid email: {email}")
-        await message.answer("Пожалуйста, введите корректный email.")
+        await message.answer("Пожалуйста, введи корректный email.")
         return
     
     logger.info(f"User {message.from_user.id} provided email: {email}")
@@ -102,7 +107,7 @@ async def process_aiesec(message: types.Message, state: FSMContext):
     is_member = message.text.lower() == "да"
     await state.update_data(is_aiesec_member=is_member)
     
-    await message.answer("Откуда узнал(а) о форуме?", reply_markup=get_source_kb())
+    await message.answer("Откуда ты узнал(а) о форуме?", reply_markup=get_source_kb())
     await state.set_state(Registration.source)
 
 @router.message(Registration.source)
@@ -126,7 +131,7 @@ async def process_source(message: types.Message, state: FSMContext):
         await message.answer("От какого партнера?", reply_markup=types.ReplyKeyboardRemove())
         await state.set_state(Registration.source_details_partner)
     elif source == "Другое":
-        await message.answer("Откуда вы узнали о форуме?", reply_markup=types.ReplyKeyboardRemove())
+        await message.answer("Откуда ты узнал(а) о форуме?", reply_markup=types.ReplyKeyboardRemove())
         await state.set_state(Registration.source_details_other)
     else:
         # Skip details, move to Education
@@ -167,7 +172,7 @@ async def process_ed_status(message: types.Message, state: FSMContext):
     
     if status == "Да, в ВУЗе или колледже":
         await message.answer(
-            "Выберите ваш ВУЗ из списка или нажмите 'Другое':",
+            "Выбери свой ВУЗ из списка или нажми 'Другое':",
             reply_markup=get_universities_kb()
         )
         await state.set_state(Registration.uni_current_name)
@@ -185,28 +190,28 @@ async def process_ed_status(message: types.Message, state: FSMContext):
 async def process_uni_current(message: types.Message, state: FSMContext):
     uni = message.text
     if uni == "Другое":
-        await message.answer("Введите название вашего ВУЗа вручную:", reply_markup=types.ReplyKeyboardRemove())
+        await message.answer("Введи название своего ВУЗа вручную:", reply_markup=types.ReplyKeyboardRemove())
         await state.set_state(Registration.uni_current_custom)
     elif uni in config.UNIVERSITIES:
         await state.update_data(university=uni)
-        await message.answer("На каком вы курсе?", reply_markup=get_course_kb())
+        await message.answer("На каком ты курсе?", reply_markup=get_course_kb())
         await state.set_state(Registration.uni_current_course)
     else:
         # Fallback
         await state.update_data(university=uni)
-        await message.answer("На каком вы курсе?", reply_markup=get_course_kb())
+        await message.answer("На каком ты курсе?", reply_markup=get_course_kb())
         await state.set_state(Registration.uni_current_course)
 
 @router.message(Registration.uni_current_custom)
 async def process_uni_custom(message: types.Message, state: FSMContext):
     await state.update_data(university=message.text)
-    await message.answer("На каком вы курсе?", reply_markup=get_course_kb())
+    await message.answer("На каком ты курсе?", reply_markup=get_course_kb())
     await state.set_state(Registration.uni_current_course)
 
 @router.message(Registration.uni_current_course)
 async def process_uni_course(message: types.Message, state: FSMContext):
     await state.update_data(course=message.text)
-    await message.answer("Какое у вас направление обучения (специальность)?", reply_markup=types.ReplyKeyboardRemove())
+    await message.answer("Какое у тебя направление обучения (специальность)?", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(Registration.uni_current_specialty)
 
 @router.message(Registration.uni_current_specialty)
@@ -220,17 +225,17 @@ async def process_uni_specialty(message: types.Message, state: FSMContext):
 async def process_uni_past_choose(message: types.Message, state: FSMContext):
     uni = message.text
     if uni == "Другое":
-        await message.answer("Введите название вашего ВУЗа вручную:", reply_markup=types.ReplyKeyboardRemove())
+        await message.answer("Введи название своего ВУЗа вручную:", reply_markup=types.ReplyKeyboardRemove())
         await state.set_state(Registration.uni_past_custom)
     else:
         await state.update_data(university=uni, course="Закончил")
-        await message.answer("Какое у вас было направление обучения (специальность)?", reply_markup=types.ReplyKeyboardRemove())
+        await message.answer("Какое у тебя было направление обучения (специальность)?", reply_markup=types.ReplyKeyboardRemove())
         await state.set_state(Registration.uni_past_specialty)
 
 @router.message(Registration.uni_past_custom)
 async def process_uni_past_custom(message: types.Message, state: FSMContext):
     await state.update_data(university=message.text, course="Закончил")
-    await message.answer("Какое у вас было направление обучения (специальность)?", reply_markup=types.ReplyKeyboardRemove())
+    await message.answer("Какое у тебя было направление обучения (специальность)?", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(Registration.uni_past_specialty)
 
 @router.message(Registration.uni_past_specialty)
@@ -342,6 +347,6 @@ async def process_expectations(message: types.Message, state: FSMContext, bot: B
 
     await state.clear()
     await message.answer(
-        "Регистрация завершена! Скоро через бот с тобой свяжется наш менеджер и сообщит о результатах отбора 😊",
+        "Регистрация завершена! Скоро через бот с тобой свяжется наш менеджер и расскажет подробности участия 😊",
         reply_markup=get_main_menu_kb()
     )

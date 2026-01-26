@@ -38,8 +38,8 @@ async def show_info_menu(message: types.Message):
             "◼️ Нетворкинг и возможность найти единомышленников в своём городе;\n"
             "◼️ Конкурсы и подарки.\n\n"
             "Форум создаётся экспертом в области развития лидерства молодёжи — международной некоммерческой организацией AIESEC.\n\n"
-            "Участие на форуме бесплатное! Проходи отбор и присоединяйся к команде единомышленников!\n\n"
-            "Выберите, что вас интересует:"
+            "Участие на форуме бесплатное! Регистрируйся и присоединяйся к команде единомышленников!\n\n"
+            "Выбери, что тебя интересует:"
         )
         await message.answer(text, reply_markup=get_info_submenu_kb(), parse_mode="HTML")
 
@@ -145,7 +145,7 @@ async def process_become_ambassador(callback: types.CallbackQuery, bot: Bot):
 async def ask_organizer_start(message: types.Message, state: FSMContext):
     logger.info(f"User {message.from_user.id} wants to ask a question")
     await message.answer(
-        "Напишите ваш вопрос, и мы передадим его организаторам.",
+        "Напиши свой вопрос, и мы передадим его организаторам.",
         reply_markup=get_cancel_kb()
     )
     await state.set_state(Question.waiting_for_question)
@@ -176,7 +176,7 @@ async def process_question(message: types.Message, state: FSMContext, bot: Bot):
                 pass
         
         if sent_count > 0:
-            await message.answer("Ваш вопрос отправлен!", reply_markup=get_main_menu_kb())
+            await message.answer("Твой вопрос отправлен!", reply_markup=get_main_menu_kb())
         else:
             logger.error(f"Failed to send question from {message.from_user.id} to any admin")
             await message.answer("Не удалось отправить вопрос, попробуйте позже.", reply_markup=get_main_menu_kb())
