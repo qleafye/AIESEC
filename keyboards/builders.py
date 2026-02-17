@@ -89,15 +89,3 @@ def get_cancel_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardBuilder()
     kb.button(text="Отмена")
     return kb.as_markup(resize_keyboard=True, one_time_keyboard=True)
-
-
-def get_ambassador_kb() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text="Хочу в команду!", callback_data="become_ambassador")
-    return builder.as_markup()
-
-def get_socials_kb() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    # Пример соцсетей
-    builder.button(text="Telegram канал", url="https://t.me/telegram")
-    return builder.as_markup()

@@ -1,5 +1,6 @@
 import logging
 from aiogram import Router, F, types, Bot
+from aiogram.types import FSInputFile
 from aiogram.fsm.context import FSMContext
 from database.db import get_user, set_ambassador_candidate
 from keyboards.builders import (
@@ -19,15 +20,15 @@ logger = logging.getLogger(__name__)
 async def show_info_menu(message: types.Message):
     logger.info(f"User {message.from_user.id} requested Info menu")
     # Check if both are confirmed
+    # Show summary AND the submenu so users can see details/photos
     if config.IS_DATE_CONFIRMED and config.IS_PLACE_CONFIRMED:
-        # One button / text for everything
         text = (
             "<b>Форум SkillUp</b>\n\n"
             "🗓 <b>Дата:</b> 26 апреля\n"
             "⌚ <b>Время:</b> с 11:00 до 19:00\n"
-            "📍 <b>Место:</b> ITHUB (адрес уточняется)"
+            "📍 <b>Место:</b> ITHUB"
         )
-        await message.answer(text, parse_mode="HTML")
+        await message.answer(text, reply_markup=get_info_submenu_kb(), parse_mode="HTML")
     else:
         # Show sub-menu
         text = (
@@ -55,10 +56,22 @@ async def info_date(callback: types.CallbackQuery):
 @router.callback_query(F.data == "info_place")
 async def info_place(callback: types.CallbackQuery):
     if config.IS_PLACE_CONFIRMED:
-         text = "📍 Место проведения: ITHUB (адрес уточняется) с 11:00 до 19:00"
+         text = (
+            "<b>Наша площадка — IThub college!</b> 🚀\n\n"
+            "IThub — это единственный в России колледж подготовки IT-специалистов на базе 9, 10 или 11 класса по бизнес-ориентированной методологии через человекоцентричный подход к развитию личности.\n\n"
+            "Помимо клёвого подхода к образовательному процессу, у колледжа есть огромное пространство в сердце Петербурга, идеально подходящее для нашего форума (кстати, для него мы займём целых два этажа!)\n\n"
+            
+            "📍 <b>Адрес:</b> ITHUB (СпБ, Аптекарский проспект 2, Ⓜ️Петроградская)"
+         )
+         try:
+            photo = FSInputFile("resources/venue.jpg")
+            await callback.message.answer_photo(photo, caption=text, parse_mode="HTML")
+         except Exception:
+            await callback.message.answer(text, parse_mode="HTML")
     else:
          text = "📍 Место проведения в процессе подтверждения. Как только всё будет готово, мы напишем!"
-    await callback.message.answer(text)
+         await callback.message.answer(text)
+    
     await callback.answer()
 
 
