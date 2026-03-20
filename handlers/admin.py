@@ -7,7 +7,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from config import config
-from database.db import get_stats, get_all_users_ids, export_users_csv
+from database.db import get_stats, get_all_users_ids, export_users_csv, get_user_by_username
 from handlers.states import Broadcast
 
 router = Router()
@@ -21,10 +21,34 @@ async def cmd_admin_help(message: types.Message):
         "👮‍♂️ <b>Панель администратора</b>\n\n"
         "/stats - Статистика регистраций\n"
         "/export - Скачать базу пользователей (CSV)\n"
-        "/broadcast - Рассылка сообщения всем\n\n"
+        "/broadcast - Рассылка сообщения всем\n"
+        "/find @username - Найти пользователя по юзернейму\n\n"
         "<i>💡 Отправьте мне сообщение с кастомным эмодзи (Premium), чтобы узнать его ID.</i>"
     )
     await message.answer(text, parse_mode="HTML")
+
+@router.message(Command("find"), is_admin)
+async def cmd_find_user(message: types.Message):
+    args = message.text.split()
+    if len(args) < 2:
+        await message.answer("⚠️ Используйте формат: /find @username")
+        return
+
+    username = args[1]
+    user = await get_user_by_username(username)
+    
+    if user:
+        text = (
+            f"👤 <b>Пользователь найден:</b>\n"
+            f"ID: <code>{user['telegram_id']}</code>\n"
+            f"Имя: {user['full_name']}\n"
+            f"Username: {user['username']}\n"
+            f"Email: {user['email']}\n"
+            f"Регистрация: {user['registration_date']}"
+        )
+        await message.answer(text, parse_mode="HTML")
+    else:
+        await message.answer(f"❌ Пользователь {username} не найден в базе данных.")
 
 def has_custom_emoji(message: types.Message):
     if not message.entities:

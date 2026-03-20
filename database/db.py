@@ -73,6 +73,19 @@ async def get_user(telegram_id: int):
                 return dict(row)
             return None
 
+async def get_user_by_username(username: str):
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        # Ensure username starts with @ for search, or try both
+        if not username.startswith('@'):
+            username = f"@{username}"
+            
+        async with db.execute('SELECT * FROM users WHERE username = ? COLLATE NOCASE', (username,)) as cursor:
+            row = await cursor.fetchone()
+            if row:
+                return dict(row)
+            return None
+
 async def set_ambassador_candidate(telegram_id: int):
     async with aiosqlite.connect(config.DB_PATH) as db:
         await db.execute('UPDATE users SET is_ambassador_candidate = 1 WHERE telegram_id = ?', (telegram_id,))
