@@ -1,10 +1,11 @@
 import csv
 import io
 import asyncio
+import os
 from aiogram import Router, F, types, Bot
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from aiogram.types import BufferedInputFile
+from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from config import config
 from database.db import get_stats, get_all_users_ids, export_users_csv
 from handlers.states import Broadcast
@@ -78,16 +79,75 @@ async def cmd_export(message: types.Message):
 
 @router.message(Command("broadcast"), is_admin)
 async def cmd_broadcast(message: types.Message, state: FSMContext):
-    await message.answer("Отправьте сообщение (текст или фото с подписью) для рассылки всем пользователям.")
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Все пользователи", callback_data="broadcast_all")],
+        [InlineKeyboardButton(text="📄 По файлу в проекте", callback_data="broadcast_local")]
+    ])
+    await message.answer("Выберите целевую аудиторию рассылки:", reply_markup=kb)
+    await state.set_state(Broadcast.target_selection)
+
+@router.callback_query(F.data == "broadcast_all", Broadcast.target_selection)
+async def process_broadcast_all(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Отправьте сообщение (текст или фото с подписью) для рассылки всем пользователям.")
+    await state.update_data(target_type="all")
     await state.set_state(Broadcast.message)
+
+@router.callback_query(F.data == "broadcast_local", Broadcast.target_selection)
+async def process_broadcast_local_file(callback: types.CallbackQuery, state: FSMContext):
+    file_path = "data/broadcast_target.txt"
+    
+    if not os.path.exists(file_path):
+        await callback.message.edit_text(f"❌ Файл {file_path} не найден! Создайте его и добавьте ID пользователей.")
+        await state.clear()
+        return
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        user_ids = []
+        for line in content.splitlines():
+            line = line.strip()
+            # Handle potential common delimiters
+            clean_line = line.replace(',', '').replace(';', '')
+            
+            if clean_line.isdigit():
+                user_ids.append(int(clean_line))
+        
+        if not user_ids:
+            await callback.message.edit_text("⚠️ Файл пуст или не содержит корректных ID.")
+            await state.clear()
+            return
+
+        # Unique IDs
+        user_ids = list(set(user_ids))
+            
+        await state.update_data(target_type="list", target_users=user_ids)
+        await callback.message.edit_text(f"✅ Найдено {len(user_ids)} пользователей в файле.\nТеперь отправьте сообщение для рассылки.")
+        await state.set_state(Broadcast.message)
+        
+    except Exception as e:
+        await callback.message.edit_text(f"Ошибка при чтении файла: {e}")
+        await state.clear()
 
 @router.message(Broadcast.message, is_admin)
 async def process_broadcast(message: types.Message, state: FSMContext, bot: Bot):
-    users_ids = await get_all_users_ids()
+    data = await state.get_data()
+    target_type = data.get("target_type", "all")
+    
+    if target_type == "list":
+        users_ids = data.get("target_users", [])
+        if not users_ids:
+             await message.answer("Список пользователей пуст. Рассылка отменена.")
+             await state.clear()
+             return
+    else:
+        users_ids = await get_all_users_ids()
+        
     count = 0
     blocked = 0
     
-    await message.answer(f"Начинаю рассылку на {len(users_ids)} пользователей...")
+    status_msg = await message.answer(f"Начинаю рассылку на {len(users_ids)} пользователей...")
     
     for chat_id in users_ids:
         try:

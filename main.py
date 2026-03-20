@@ -7,6 +7,7 @@ from config import config
 from database.db import init_db
 from handlers import registration, user_actions, admin
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 
 async def main():
@@ -25,8 +26,14 @@ async def main():
     # Init DB
     await init_db()
     
-    bot = Bot(token=config.BOT_TOKEN.get_secret_value())
-    default=DefaultBotProperties(parse_mode=ParseMode.HTML)
+    default = DefaultBotProperties(parse_mode=ParseMode.HTML)
+    
+    session = None
+    if config.PROXY_URL:
+        session = AiohttpSession(proxy=config.PROXY_URL.get_secret_value())
+        logger.info("Using configured proxy")
+
+    bot = Bot(token=config.BOT_TOKEN.get_secret_value(), default=default, session=session)
     dp = Dispatcher(storage=MemoryStorage())
     
     # Register routers

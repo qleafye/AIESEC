@@ -42,4 +42,5 @@ class Question(StatesGroup):
     waiting_for_question = State()
 
 class Broadcast(StatesGroup):
+    target_selection = State()
     message = State()

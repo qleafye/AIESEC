@@ -6,5 +6,9 @@ services:
     restart: always
     env_file:
       - .env
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
     volumes:
       - ./data:/app/data
+      - ./google_credentials.json:/app/google_credentials.json

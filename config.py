@@ -4,6 +4,7 @@ from pydantic import SecretStr
 
 class Settings(BaseSettings):
     BOT_TOKEN: SecretStr
+    PROXY_URL: SecretStr | None = None
     ADMIN_IDS: List[int]
     UNIVERSITIES: List[str] = [
         "ИТМО",

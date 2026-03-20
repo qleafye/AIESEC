@@ -347,6 +347,13 @@ async def process_expectations(message: types.Message, state: FSMContext, bot: B
 
     await state.clear()
     await message.answer(
-        "Регистрация завершена! Скоро через бот с тобой свяжется наш менеджер и расскажет подробности участия 😊",
+        "Регистрация завершена! Увидимся на форуме! 🎉\n\n",
         reply_markup=get_main_menu_kb()
     )
+
+    # Send CV Guide
+    try:
+        cv_guide = FSInputFile("resources/CV_Guide.pdf")
+        await message.answer_document(cv_guide, caption="🎁 А вот и твой бонус за регистрацию — гайд по составлению резюме!")
+    except Exception as e:
+        logger.error(f"Failed to send CV guide to {message.from_user.id}: {e}")
