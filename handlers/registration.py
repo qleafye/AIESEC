@@ -5,7 +5,7 @@ from aiogram import Router, F, types, Bot
 from aiogram.types import FSInputFile
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from database.db import get_user, add_user
+from database.db import get_user, add_user, get_registration_form_mode
 from handlers.states import Registration
 from services.sheets import append_to_sheet
 from keyboards.builders import (
@@ -56,6 +56,7 @@ async def start_registration(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     logger.info(f"User {user_id} started registration")
     user = await get_user(message.from_user.id)
+    registration_mode = await get_registration_form_mode()
     
     # Check if user exists. Admins can re-register infinitely.
     if user:
@@ -66,7 +67,10 @@ async def start_registration(message: types.Message, state: FSMContext):
             await message.answer("Ты уже зарегистрирован!😊")
             return
 
-    await message.answer("Супер, начнем с простого. Напиши свою Фамилию и Имя:")
+    if registration_mode == "short":
+        await message.answer("Супер, короткая форма включена. Напиши свою Фамилию и Имя:")
+    else:
+        await message.answer("Супер, начнем с простого. Напиши свою Фамилию и Имя:")
     await state.set_state(Registration.full_name)
 
 @router.message(Registration.full_name)
@@ -77,13 +81,19 @@ async def process_name(message: types.Message, state: FSMContext):
     await state.set_state(Registration.age)
 
 @router.message(Registration.age)
-async def process_age(message: types.Message, state: FSMContext):
+async def process_age(message: types.Message, state: FSMContext, bot: Bot):
     if not message.text.isdigit():
         logger.warning(f"User {message.from_user.id} provided invalid age: {message.text}")
         await message.answer("Пожалуйста, введи число (возраст).")
         return
     logger.info(f"User {message.from_user.id} provided age: {message.text}")
     await state.update_data(age=int(message.text))
+
+    registration_mode = await get_registration_form_mode()
+    if registration_mode == "short":
+        await finalize_registration(message, state, bot=bot, is_short=True)
+        return
+
     await message.answer("Напиши свой Email:")
     await state.set_state(Registration.email)
 
@@ -287,63 +297,77 @@ async def process_skills(message: types.Message, state: FSMContext):
 @router.message(Registration.expectations)
 async def process_expectations(message: types.Message, state: FSMContext, bot: Bot):
     await state.update_data(expectations=message.text)
-    
+    await finalize_registration(message, state, bot=bot, is_short=False)
+
+
+def build_sheet_row(data: dict) -> list:
+    # Keep a stable number and order of columns to avoid Google Sheets conflicts.
+    return [
+        data.get('telegram_id'),
+        data.get('username', '-'),
+        data.get('registration_date', '-'),
+        data.get('full_name', '-'),
+        data.get('age', '-'),
+        data.get('email', '-'),
+        "Yes" if data.get('is_aiesec_member') else "No",
+        data.get('source', '-'),
+        data.get('source_details', '-'),
+        data.get('education_status', '-'),
+        data.get('university', '-'),
+        data.get('course', '-'),
+        data.get('specialty', '-'),
+        "Yes" if data.get('work_status') else "No",
+        data.get('work_sphere', '-'),
+        data.get('missing_skills', '-'),
+        data.get('expectations', '-'),
+    ]
+
+
+async def finalize_registration(message: types.Message, state: FSMContext, bot: Bot | None, is_short: bool):
     data = await state.get_data()
     logger.info(f"User {message.from_user.id} finished registration. Saving data.")
-    
-    # Prepare data for saving
+
     data['telegram_id'] = message.from_user.id
     username = message.from_user.username or "No Username"
     data['username'] = f"@{username}"
     data['registration_date'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    # 1. Save to SQLite
+
+    if is_short:
+        data.setdefault('email', '-')
+        data.setdefault('is_aiesec_member', False)
+        data.setdefault('source', 'Короткая форма')
+        data.setdefault('source_details', '-')
+        data.setdefault('education_status', '-')
+        data.setdefault('university', '-')
+        data.setdefault('course', '-')
+        data.setdefault('specialty', '-')
+        data.setdefault('work_status', False)
+        data.setdefault('work_sphere', '-')
+        data.setdefault('missing_skills', '-')
+        data.setdefault('expectations', '-')
+
     await add_user(data)
     logger.info(f"User {message.from_user.id} saved to DB.")
-    
-    # 2. Append to Google Sheets
-    row = [
-        data['telegram_id'],
-        data['username'],
-        data['registration_date'],
-        data['full_name'],
-        data['age'],
-        data['email'],
-        "Yes" if data['is_aiesec_member'] else "No",
-        data['source'],
-        data.get('source_details', '-'),
-        data['education_status'],
-        data.get('university', '-'),
-        data.get('course', '-'),
-        data.get('specialty', '-'),
-        "Yes" if data['work_status'] else "No",
-        data.get('work_sphere', '-'),
-        data['missing_skills'],
-        data['expectations']
-    ]
-    # We run this in background or await if using a fast async wrapper
-    # Here we made a sync service, so let's just await the wrapper (actually i made it async def but blocking code inside)
-    # Wrap in try except to not fail registration if google fails
+
+    row = build_sheet_row(data)
     try:
         await append_to_sheet(row)
         logger.info(f"User {message.from_user.id} saved to Google Spreadsheet.")
     except Exception as e:
         logger.error(f"Error saving user {message.from_user.id} to Google Sheets: {e}")
-        pass # Logging handled inside service
 
-    # 3. Notify Admin
-    if config.ADMIN_IDS:
+    if bot and config.ADMIN_IDS:
+        source_text = data.get('source', 'Короткая форма')
         admin_text = (
             f"🆕 <b>Новая регистрация!</b>\n"
-            f"👤 {data['full_name']} ({data['username']})\n"
-            f"📝 {data['source']}"
+            f"👤 {data.get('full_name', '-')} ({data.get('username', '-')})\n"
+            f"📝 {source_text}"
         )
         for admin_id in config.ADMIN_IDS:
             try:
                 await bot.send_message(admin_id, admin_text, parse_mode="HTML")
             except Exception as e:
                 logger.error(f"Failed to notify admin {admin_id}: {e}")
-                pass
 
     await state.clear()
     await message.answer(
@@ -351,11 +375,8 @@ async def process_expectations(message: types.Message, state: FSMContext, bot: B
         reply_markup=get_main_menu_kb()
     )
 
-    # Send CV Guide
     try:
-        # cv_guide = FSInputFile("resources/CV_Guide.pdf") # OLD SLOW UPLOAD
-        cv_guide = "BQACAgIAAxkDAAIQO2nAQvQ9dovIDxH8Excq2nLzGrwAA_6bAAJoRwABSlP2ExucbIGmOgQ" # NEW FAST ID
-        msg = await message.answer_document(cv_guide, caption="🎁 А вот и твой бонус за регистрацию — гайд по составлению резюме!")
-        # logger.info(f"DOCUMENT FILE ID: {msg.document.file_id}")
+        cv_guide = "BQACAgIAAxkDAAIQO2nAQvQ9dovIDxH8Excq2nLzGrwAA_6bAAJoRwABSlP2ExucbIGmOgQ"
+        await message.answer_document(cv_guide, caption="🎁 А вот и твой бонус за регистрацию — гайд по составлению резюме!")
     except Exception as e:
         logger.error(f"Failed to send CV guide to {message.from_user.id}: {e}")

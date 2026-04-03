@@ -29,6 +29,18 @@ async def init_db():
                 is_ambassador_candidate BOOLEAN DEFAULT 0
             )
         ''')
+
+        await db.execute('''
+            CREATE TABLE IF NOT EXISTS bot_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        ''')
+
+        await db.execute('''
+            INSERT OR IGNORE INTO bot_settings (key, value)
+            VALUES ('registration_form_mode', 'full')
+        ''')
         await db.commit()
 
 async def add_user(data: dict):
@@ -45,23 +57,50 @@ async def add_user(data: dict):
         ''', (
             data['telegram_id'],
             data.get('username'),
-            data['full_name'],
-            data['email'],
-            data['age'],
+            data.get('full_name', ''),
+            data.get('email', '-'),
+            data.get('age'),
             data.get('is_aiesec_member', False),
-            data['source'],
+            data.get('source', '-'),
             data.get('source_details'),
-            data['education_status'],
+            data.get('education_status', '-'),
             data.get('university'),
             data.get('course'),
             data.get('specialty'),
             data.get('work_status', False),
             data.get('work_sphere'),
-            data['missing_skills'],
-            data['expectations'],
+            data.get('missing_skills', '-'),
+            data.get('expectations', '-'),
             data['registration_date'],
             data.get('is_ambassador_candidate', False)
         ))
+        await db.commit()
+
+async def get_registration_form_mode() -> str:
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        async with db.execute(
+            "SELECT value FROM bot_settings WHERE key = 'registration_form_mode'"
+        ) as cursor:
+            row = await cursor.fetchone()
+            if not row:
+                return "full"
+            mode = (row[0] or "full").strip().lower()
+            return mode if mode in {"full", "short"} else "full"
+
+async def set_registration_form_mode(mode: str):
+    normalized_mode = (mode or "full").strip().lower()
+    if normalized_mode not in {"full", "short"}:
+        raise ValueError("Invalid registration form mode")
+
+    async with aiosqlite.connect(config.DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO bot_settings (key, value)
+            VALUES ('registration_form_mode', ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (normalized_mode,)
+        )
         await db.commit()
 
 async def get_user(telegram_id: int):

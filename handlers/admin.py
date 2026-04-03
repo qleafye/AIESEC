@@ -7,7 +7,14 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, InlineKeyboardMarkup, InlineKeyboardButton
 from config import config
-from database.db import get_stats, get_all_users_ids, export_users_csv, get_user_by_username
+from database.db import (
+    get_stats,
+    get_all_users_ids,
+    export_users_csv,
+    get_user_by_username,
+    get_registration_form_mode,
+    set_registration_form_mode,
+)
 from handlers.states import Broadcast
 
 router = Router()
@@ -22,10 +29,42 @@ async def cmd_admin_help(message: types.Message):
         "/stats - Статистика регистраций\n"
         "/export - Скачать базу пользователей (CSV)\n"
         "/broadcast - Рассылка сообщения всем\n"
+        "/regform - Режим регистрации (full/short)\n"
         "/find @username - Найти пользователя по юзернейму\n\n"
         "<i>💡 Отправьте мне сообщение с кастомным эмодзи (Premium), чтобы узнать его ID.</i>"
     )
     await message.answer(text, parse_mode="HTML")
+
+@router.message(Command("regform"), is_admin)
+async def cmd_registration_form_mode(message: types.Message):
+    args = message.text.split(maxsplit=1)
+
+    if len(args) == 1:
+        current_mode = await get_registration_form_mode()
+        await message.answer(
+            "Текущий режим регистрации: "
+            f"<b>{current_mode}</b>\n"
+            "Использование: /regform full или /regform short",
+            parse_mode="HTML"
+        )
+        return
+
+    mode = args[1].strip().lower()
+    aliases = {
+        "full": "full",
+        "short": "short",
+        "полная": "full",
+        "короткая": "short",
+    }
+    normalized_mode = aliases.get(mode)
+
+    if not normalized_mode:
+        await message.answer("Неверный режим. Используйте: /regform full или /regform short")
+        return
+
+    await set_registration_form_mode(normalized_mode)
+    readable = "полная" if normalized_mode == "full" else "короткая"
+    await message.answer(f"Режим регистрации переключен: <b>{readable}</b>", parse_mode="HTML")
 
 @router.message(Command("find"), is_admin)
 async def cmd_find_user(message: types.Message):
