@@ -81,8 +81,8 @@ def get_ambassador_kb() -> InlineKeyboardMarkup:
 
 def get_socials_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Telegram канал", url="https://t.me/telegram") # Replace with actual link
-    builder.button(text="ВКонтакте", url="https://vk.com/aiesec")    # Replace with actual link
+    builder.button(text="Группа в Telegram", url="https://t.me/skillup_aiesec")
+    builder.button(text="Группа во ВКонтакте", url="https://vk.com/skillup_aiesec")
     return builder.as_markup()
 
 def get_cancel_kb() -> ReplyKeyboardMarkup:

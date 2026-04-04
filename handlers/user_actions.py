@@ -7,7 +7,8 @@ from keyboards.builders import (
     get_ambassador_kb, 
     get_cancel_kb, 
     get_main_menu_kb,
-    get_info_submenu_kb
+    get_info_submenu_kb,
+    get_socials_kb
 )
 from handlers.states import Question
 from config import config
@@ -78,15 +79,33 @@ async def info_place(callback: types.CallbackQuery):
 @router.message(F.text == "📅 Программа форума")
 async def show_program(message: types.Message):
     logger.info(f"User {message.from_user.id} requested Program")
-    # Заглушка, так как программа может меняться
     text = (
-        "Держи, это программа форума! \n"
-        "У нас будет два трека: \n"
-        "1. <b>Hard Skills</b> - погружение в технологии\n"
-        "2. <b>Soft Skills</b> - лидерство и коммуникация\n\n"
-        "В ней могут происходить небольшие изменения. Как только появится финальный вариант, сообщим тебе!"
+        "<b>Программа форума SkillUp</b>\n\n"
+        "🟢 <b>11:30-12:00</b> — Регистрация и нетворкинг\n"
+        "🟢 <b>12:00</b> — Открытие\n"
+        "🟢 <b>12:30-13:10</b> — Ключевая речь: «Синдром самозванца»\n"
+        "🟢 <b>13:10-13:25</b> — Брейк\n"
+        "🟢 <b>13:25-14:05</b> — Параллельные сессии:\n"
+        "• Резюме-киллер: разбор структуры для HR\n"
+        "• Корпоративное дзюдо: границы и коммуникация\n"
+        "• Свободное общение\n"
+        "🟢 <b>14:05-14:45</b> — Обед (и активности на стендах)\n"
+        "🟢 <b>14:45-15:15</b> — Сессия AIESEC: истории стажировок и возможности\n"
+        "🟢 <b>15:15-15:30</b> — Брейк\n"
+        "🟢 <b>15:30-16:15</b> — Параллельные сессии:\n"
+        "• System Design: рисуем архитектуру на флипчартах\n"
+        "• O2O-прожарка резюме (1-на-1 с HR)\n"
+        "• Стресс-собес: разбор плохого резюме (шоу на сцене)\n"
+        "🟢 <b>16:30-17:30</b> — Ночь айти-провалов: истории неудач топовых спикеров\n"
+        "🟢 <b>17:30</b> — Закрытие\n"
+        "🟢 <b>После</b> — Афтерпати ;)\n\n"
+        "Возможны небольшие изменения в расписании."
     )
-    await message.answer(text, parse_mode="HTML")
+    try:
+        photo = FSInputFile("resources/program.jpg")
+        await message.answer_photo(photo, caption=text, parse_mode="HTML")
+    except Exception:
+        await message.answer(text, parse_mode="HTML")
 
 # 🗣 Спикеры
 @router.message(F.text == "🗣 Спикеры")
@@ -105,9 +124,13 @@ async def show_contacts(message: types.Message):
     logger.info(f"User {message.from_user.id} requested Contacts")
     text = (
         "По всем вопросам пиши нашему менеджеру Юле:\n"
-        "👉 @julyisnearby"
+        "👉 @julyisnearby\n\n"
+        "Если удобнее, можешь писать сюда: @qleafye\n\n"
+        "Наши группы:\n"
+        "VK: https://vk.com/skillup_aiesec\n"
+        "TG: https://t.me/skillup_aiesec"
     )
-    await message.answer(text)
+    await message.answer(text, reply_markup=get_socials_kb())
 
 # ⭐ Стать Амбассадором
 @router.message(F.text == "⭐ Стать Амбассадором")
