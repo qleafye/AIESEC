@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from aiogram import Router, F, types, Bot
 from aiogram.types import FSInputFile
 from aiogram.fsm.context import FSMContext
@@ -15,6 +16,36 @@ from config import config
 
 router = Router()
 logger = logging.getLogger(__name__)
+
+PROGRAM_FILE_ID_CACHE_PATH = Path("data/program_photo_file_id.txt")
+_program_photo_file_id_cache = None
+
+
+def _read_program_photo_file_id() -> str | None:
+    global _program_photo_file_id_cache
+    if _program_photo_file_id_cache:
+        return _program_photo_file_id_cache
+
+    try:
+        if PROGRAM_FILE_ID_CACHE_PATH.exists():
+            file_id = PROGRAM_FILE_ID_CACHE_PATH.read_text(encoding="utf-8").strip()
+            if file_id:
+                _program_photo_file_id_cache = file_id
+                return file_id
+    except Exception as e:
+        logger.warning(f"Failed to read cached program photo file_id: {e}")
+
+    return None
+
+
+def _save_program_photo_file_id(file_id: str) -> None:
+    global _program_photo_file_id_cache
+    _program_photo_file_id_cache = file_id
+    try:
+        PROGRAM_FILE_ID_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        PROGRAM_FILE_ID_CACHE_PATH.write_text(file_id, encoding="utf-8")
+    except Exception as e:
+        logger.warning(f"Failed to persist cached program photo file_id: {e}")
 
 # ℹ️ Информация о форуме
 @router.message(F.text == "ℹ️ Информация о форуме")
@@ -79,33 +110,23 @@ async def info_place(callback: types.CallbackQuery):
 @router.message(F.text == "📅 Программа форума")
 async def show_program(message: types.Message):
     logger.info(f"User {message.from_user.id} requested Program")
-    text = (
-        "<b>Программа форума SkillUp</b>\n\n"
-        "🟢 <b>11:30-12:00</b> — Регистрация и нетворкинг\n"
-        "🟢 <b>12:00</b> — Открытие\n"
-        "🟢 <b>12:30-13:10</b> — Ключевая речь: «Синдром самозванца»\n"
-        "🟢 <b>13:10-13:25</b> — Брейк\n"
-        "🟢 <b>13:25-14:05</b> — Параллельные сессии:\n"
-        "• Резюме-киллер: разбор структуры для HR\n"
-        "• Корпоративное дзюдо: границы и коммуникация\n"
-        "• Свободное общение\n"
-        "🟢 <b>14:05-14:45</b> — Обед (и активности на стендах)\n"
-        "🟢 <b>14:45-15:15</b> — Сессия AIESEC: истории стажировок и возможности\n"
-        "🟢 <b>15:15-15:30</b> — Брейк\n"
-        "🟢 <b>15:30-16:15</b> — Параллельные сессии:\n"
-        "• System Design: рисуем архитектуру на флипчартах\n"
-        "• O2O-прожарка резюме (1-на-1 с HR)\n"
-        "• Стресс-собес: разбор плохого резюме (шоу на сцене)\n"
-        "🟢 <b>16:30-17:30</b> — Ночь айти-провалов: истории неудач топовых спикеров\n"
-        "🟢 <b>17:30</b> — Закрытие\n"
-        "🟢 <b>После</b> — Афтерпати ;)\n\n"
-        "Возможны небольшие изменения в расписании."
-    )
+    cached_file_id = _read_program_photo_file_id()
+
+    if cached_file_id:
+        try:
+            await message.answer_photo(cached_file_id)
+            return
+        except Exception as e:
+            logger.warning(f"Failed to send program photo by cached file_id: {e}")
+
     try:
         photo = FSInputFile("resources/program.jpg")
-        await message.answer_photo(photo, caption=text, parse_mode="HTML")
-    except Exception:
-        await message.answer(text, parse_mode="HTML")
+        sent = await message.answer_photo(photo)
+        if sent.photo:
+            _save_program_photo_file_id(sent.photo[-1].file_id)
+    except Exception as e:
+        logger.error(f"Failed to send program photo: {e}")
+        await message.answer("Не удалось загрузить программу форума. Попробуй позже.")
 
 # 🗣 Спикеры
 @router.message(F.text == "🗣 Спикеры")
