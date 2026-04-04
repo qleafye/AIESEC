@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 PROGRAM_FILE_ID_CACHE_PATH = Path("data/program_photo_file_id.txt")
 _program_photo_file_id_cache = None
+PROGRAM_UPDATE_NOTE = "Программа форума может немного измениться."
 
 
 def _read_program_photo_file_id() -> str | None:
@@ -114,14 +115,14 @@ async def show_program(message: types.Message):
 
     if cached_file_id:
         try:
-            await message.answer_photo(cached_file_id)
+            await message.answer_photo(cached_file_id, caption=PROGRAM_UPDATE_NOTE)
             return
         except Exception as e:
             logger.warning(f"Failed to send program photo by cached file_id: {e}")
 
     try:
         photo = FSInputFile("resources/program.jpg")
-        sent = await message.answer_photo(photo)
+        sent = await message.answer_photo(photo, caption=PROGRAM_UPDATE_NOTE)
         if sent.photo:
             _save_program_photo_file_id(sent.photo[-1].file_id)
     except Exception as e:
