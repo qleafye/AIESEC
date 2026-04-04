@@ -123,9 +123,7 @@ async def show_speakers(message: types.Message):
 async def show_contacts(message: types.Message):
     logger.info(f"User {message.from_user.id} requested Contacts")
     text = (
-        "По всем вопросам пиши нашему менеджеру Юле:\n"
-        "👉 @julyisnearby\n\n"
-        "Если удобнее, можешь писать сюда: @qleafye\n\n"
+        "По всем вопросам пиши сюда: @qleafye\n\n"
         "Наши группы:\n"
         "VK: https://vk.com/skillup_aiesec\n"
         "TG: https://t.me/skillup_aiesec"
