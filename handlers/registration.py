@@ -104,18 +104,6 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
     await _start_registration_flow(message, state, referrer_id=referrer_id)
 
 
-@router.message(F.text == "📝 Зарегистрироваться")
-async def start_registration(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    user = await get_user(user_id)
-
-    if user and user_id not in config.ADMIN_IDS:
-        await message.answer("Ты уже зарегистрирован!", reply_markup=get_main_menu_kb())
-        return
-
-    await _start_registration_flow(message, state)
-
-
 @router.message(Registration.full_name)
 async def process_full_name(message: types.Message, state: FSMContext):
     full_name = (message.text or "").strip()

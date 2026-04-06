@@ -7,7 +7,6 @@ from database.db import get_user
 from keyboards.builders import (
     get_cancel_kb, 
     get_main_menu_kb,
-    get_registration_only_kb,
     get_info_submenu_kb,
     get_socials_kb
 )
@@ -28,8 +27,7 @@ async def ensure_registered(message: types.Message) -> bool:
         return True
 
     await message.answer(
-        "Чтобы пользоваться ботом, сначала нужно зарегистрироваться.",
-        reply_markup=get_registration_only_kb(),
+        "Чтобы пользоваться ботом, сначала нужно зарегистрироваться. Отправь команду /start.",
     )
     return False
 

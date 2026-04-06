@@ -1,25 +1,17 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from config import config
 
 # --- Main Menu ---
 def get_main_menu_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardBuilder()
-    kb.button(text="📝 Зарегистрироваться")
     kb.button(text="🔗 Моя реферальная ссылка")
     kb.button(text="ℹ️ Информация о форуме")
     kb.button(text="📅 Программа форума")
     kb.button(text="🗣 Спикеры")
     kb.button(text="📞 Контакты")
     kb.button(text="❓ Задать вопрос")
-    kb.adjust(2, 2, 2, 1)
-    return kb.as_markup(resize_keyboard=True)
-
-
-def get_registration_only_kb() -> ReplyKeyboardMarkup:
-    kb = ReplyKeyboardBuilder()
-    kb.button(text="📝 Зарегистрироваться")
-    kb.adjust(1)
+    kb.adjust(2, 2, 2)
     return kb.as_markup(resize_keyboard=True)
 
 # --- Registration Keyboards ---
