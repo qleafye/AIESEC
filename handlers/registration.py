@@ -1,4 +1,5 @@
 import logging
+import html
 from datetime import datetime
 
 from aiogram import Bot, F, Router, types
@@ -14,6 +15,7 @@ from services.sheets import append_to_sheet
 
 router = Router()
 logger = logging.getLogger(__name__)
+CV_GUIDE_FILE_ID = "BQACAgIAAxkDAAIQO2nAQvQ9dovIDxH8Excq2nLzGrwAA_6bAAJoRwABSlP2ExucbIGmOgQ"
 
 START_TEXT = (
     "Привет, будущий IT-специалист!\n"
@@ -169,11 +171,14 @@ async def finalize_registration(message: types.Message, state: FSMContext, bot: 
         logger.error(f"Failed to append user {message.from_user.id} to Google Sheet: {e}")
 
     if config.ADMIN_IDS:
+        safe_name = html.escape(str(data.get("full_name", "-")))
+        safe_username = html.escape(str(data.get("username", "-")))
+        safe_source = html.escape(str(data.get("source", "-")))
         admin_text = (
             f"🆕 <b>Новая регистрация!</b>\n"
-            f"👤 {data.get('full_name', '-')} ({data.get('username', '-')})\n"
+            f"👤 {safe_name} ({safe_username})\n"
             f"🎂 {data.get('age', '-')}\n"
-            f"📝 {data.get('source', '-')}"
+            f"📝 {safe_source}"
         )
         for admin_id in config.ADMIN_IDS:
             try:
@@ -183,3 +188,11 @@ async def finalize_registration(message: types.Message, state: FSMContext, bot: 
 
     await state.clear()
     await message.answer("Регистрация завершена! Увидимся на форуме! 🎉", reply_markup=get_main_menu_kb())
+
+    try:
+        await message.answer_document(
+            CV_GUIDE_FILE_ID,
+            caption="🎁 А вот и твой бонус за регистрацию — гайд по составлению резюме!",
+        )
+    except Exception as e:
+        logger.error(f"Failed to send CV guide to {message.from_user.id}: {e}")
