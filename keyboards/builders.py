@@ -6,13 +6,20 @@ from config import config
 def get_main_menu_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardBuilder()
     kb.button(text="📝 Зарегистрироваться")
+    kb.button(text="🔗 Моя реферальная ссылка")
     kb.button(text="ℹ️ Информация о форуме")
     kb.button(text="📅 Программа форума")
     kb.button(text="🗣 Спикеры")
     kb.button(text="📞 Контакты")
     kb.button(text="❓ Задать вопрос")
-    kb.button(text="⭐ Стать Амбассадором")
     kb.adjust(2, 2, 2, 1)
+    return kb.as_markup(resize_keyboard=True)
+
+
+def get_registration_only_kb() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="📝 Зарегистрироваться")
+    kb.adjust(1)
     return kb.as_markup(resize_keyboard=True)
 
 # --- Registration Keyboards ---
@@ -72,11 +79,6 @@ def get_info_submenu_kb() -> InlineKeyboardMarkup:
     builder.button(text="Дата и время", callback_data="info_date")
     builder.button(text="Место проведения", callback_data="info_place")
     builder.adjust(1)
-    return builder.as_markup()
-
-def get_ambassador_kb() -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-    builder.button(text="Хочу в команду!", callback_data="become_ambassador")
     return builder.as_markup()
 
 def get_socials_kb() -> InlineKeyboardMarkup:

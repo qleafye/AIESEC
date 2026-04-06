@@ -3,11 +3,11 @@ from pathlib import Path
 from aiogram import Router, F, types, Bot
 from aiogram.types import FSInputFile
 from aiogram.fsm.context import FSMContext
-from database.db import get_user, set_ambassador_candidate
+from database.db import get_user
 from keyboards.builders import (
-    get_ambassador_kb, 
     get_cancel_kb, 
     get_main_menu_kb,
+    get_registration_only_kb,
     get_info_submenu_kb,
     get_socials_kb
 )
@@ -20,6 +20,18 @@ logger = logging.getLogger(__name__)
 PROGRAM_FILE_ID_CACHE_PATH = Path("data/program_photo_file_id.txt")
 _program_photo_file_id_cache = None
 PROGRAM_UPDATE_NOTE = "Программа форума может немного измениться."
+
+
+async def ensure_registered(message: types.Message) -> bool:
+    user = await get_user(message.from_user.id)
+    if user:
+        return True
+
+    await message.answer(
+        "Чтобы пользоваться ботом, сначала нужно зарегистрироваться.",
+        reply_markup=get_registration_only_kb(),
+    )
+    return False
 
 
 def _read_program_photo_file_id() -> str | None:
@@ -51,6 +63,9 @@ def _save_program_photo_file_id(file_id: str) -> None:
 # ℹ️ Информация о форуме
 @router.message(F.text == "ℹ️ Информация о форуме")
 async def show_info_menu(message: types.Message):
+    if not await ensure_registered(message):
+        return
+
     logger.info(f"User {message.from_user.id} requested Info menu")
     # Check if both are confirmed
     # Show summary AND the submenu so users can see details/photos
@@ -110,6 +125,9 @@ async def info_place(callback: types.CallbackQuery):
 # 📅 Программа форума
 @router.message(F.text == "📅 Программа форума")
 async def show_program(message: types.Message):
+    if not await ensure_registered(message):
+        return
+
     logger.info(f"User {message.from_user.id} requested Program")
     cached_file_id = _read_program_photo_file_id()
 
@@ -132,6 +150,9 @@ async def show_program(message: types.Message):
 # 🗣 Спикеры
 @router.message(F.text == "🗣 Спикеры")
 async def show_speakers(message: types.Message):
+    if not await ensure_registered(message):
+        return
+
     logger.info(f"User {message.from_user.id} requested Speakers")
     # Заглушка
     text = (
@@ -143,6 +164,9 @@ async def show_speakers(message: types.Message):
 # 📞 Контакты
 @router.message(F.text == "📞 Контакты")
 async def show_contacts(message: types.Message):
+    if not await ensure_registered(message):
+        return
+
     logger.info(f"User {message.from_user.id} requested Contacts")
     text = (
         "По всем вопросам пиши сюда: @qleafye\n\n"
@@ -152,52 +176,24 @@ async def show_contacts(message: types.Message):
     )
     await message.answer(text, reply_markup=get_socials_kb())
 
-# ⭐ Стать Амбассадором
-@router.message(F.text == "⭐ Стать Амбассадором")
-async def become_ambassador_menu(message: types.Message):
-    logger.info(f"User {message.from_user.id} requested Ambassador menu")
-    text = (
-        "<b>Стать Амбассадором SkillUp</b>\n\n"
-        "Ты можешь стать связующим звеном между участниками и организаторами – тем, кто помогает форуму расти и становиться лучше!\n\n"
-        "<b>Выполняя несложные задания, ты:</b>\n"
-        "• Прокачаешь коммуникацию, лидерство и организаторские скиллы\n"
-        "• Найдёшь единомышленников внутри нашего комьюнити\n"
-        "• Получишь эксклюзивный мерч и подарки от организаторов\n"
-        "• Добавишь сертификат амбассадора в своё портфолио"
-    )
-    await message.answer(text, reply_markup=get_ambassador_kb(), parse_mode="HTML")
+@router.message(F.text == "🔗 Моя реферальная ссылка")
+async def my_referral_link(message: types.Message, bot: Bot):
+    if not await ensure_registered(message):
+        return
 
-@router.callback_query(F.data == "become_ambassador")
-async def process_become_ambassador(callback: types.CallbackQuery, bot: Bot):
-    user_info = f"@{callback.from_user.username}" if callback.from_user.username else f"ID: {callback.from_user.id}"
-    logger.info(f"User {callback.from_user.id} applied to be Ambassador")
-    link = f"tg://user?id={callback.from_user.id}"
-    
-    # Notify Admin
-    if config.ADMIN_IDS:
-         for admin_id in config.ADMIN_IDS:
-            try:
-                await bot.send_message(
-                    admin_id, 
-                    f"🌟 <b>Заявка в амбассадоры!</b>\nПользователь: <a href='{link}'>{user_info}</a>",
-                    parse_mode="HTML"
-                )
-            except Exception as e:
-                logger.error(f"Failed to notify admin {admin_id} about ambassador application: {e}")
-                pass
-
-    # Update DB
-    await set_ambassador_candidate(callback.from_user.id)
-    
-    await callback.message.edit_text(
-        "Спасибо, что хочешь стать частью команды SkillUp!\nМы рассмотрим твою заявку и вскоре с тобой свяжется наш менеджер для уточнения деталей", 
-        reply_markup=None
+    bot_user = await bot.get_me()
+    referral_link = f"https://t.me/{bot_user.username}?start={message.from_user.id}"
+    await message.answer(
+        "Отправь эту ссылку друзьям, чтобы пригласить их на форум!\n\n"
+        f"{referral_link}"
     )
-    await callback.answer()
 
 # ❓ Задать вопрос
 @router.message(F.text == "❓ Задать вопрос")
 async def ask_organizer_start(message: types.Message, state: FSMContext):
+    if not await ensure_registered(message):
+        return
+
     logger.info(f"User {message.from_user.id} wants to ask a question")
     await message.answer(
         "Напиши свой вопрос, и мы передадим его организаторам.",
