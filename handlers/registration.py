@@ -74,12 +74,18 @@ def _build_sheet_row(data: dict) -> list:
 
 
 async def _start_registration_flow(message: types.Message, state: FSMContext, referrer_id: int | None = None):
+    existing_data = await state.get_data()
+    saved_referrer_id = referrer_id or existing_data.get("referrer_id")
+
     await state.clear()
-    if referrer_id:
-        await state.update_data(referrer_id=referrer_id)
+    if saved_referrer_id:
+        await state.update_data(referrer_id=saved_referrer_id)
+        logger.info(f"Saved referrer_id={saved_referrer_id} for user {message.from_user.id}")
 
     await message.answer(
-        "Отлично, начинаем регистрацию." if not referrer_id else "Отлично, ты пришёл по приглашению друга. Начинаем регистрацию."
+        "Отлично, начинаем регистрацию."
+        if not saved_referrer_id
+        else "Отлично, ты пришёл по приглашению друга. Начинаем регистрацию."
     )
     await message.answer("Напиши свою Фамилию и Имя:")
     await state.set_state(Registration.full_name)
@@ -92,6 +98,8 @@ async def cmd_start(message: types.Message, state: FSMContext, command: CommandO
 
     user = await get_user(user_id)
     referrer_id = _extract_referrer_id(command.args if command else None, user_id)
+    if referrer_id:
+        logger.info(f"Deep-link referrer_id={referrer_id} for user {user_id}")
 
     if user:
         try:
